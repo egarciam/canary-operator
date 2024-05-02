@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-to-be-controlled
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: example-app-operator
+  template:
+    metadata:
+      labels:
+        app: example-app-operator
+    spec:
+      containers:
+      - name: example-container
+        image: nginx:1.21.4
+        ports:
+        - containerPort: 80

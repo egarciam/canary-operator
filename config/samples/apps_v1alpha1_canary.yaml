@@ -7,11 +7,11 @@ metadata:
     app.kubernetes.io/part-of: my-canary-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: my-canary-operator
-  name: canary-sample
+  name: one-canary-sample
   namespace: my-canary-operator-system
 spec:
   # TODO(user): Add fields here
-  deploymentName: example-app
-  image: nginx
+  deploymentName: deployment-to-be-controlled
+  image:  nginx:1.21.4
   replicas: 1
   percentage: 20

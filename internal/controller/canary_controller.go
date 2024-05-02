@@ -38,6 +38,8 @@ type CanaryReconciler struct {
 //+kubebuilder:rbac:groups=apps.egarciam.com,resources=canaries,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps.egarciam.com,resources=canaries/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=apps.egarciam.com,resources=canaries/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
