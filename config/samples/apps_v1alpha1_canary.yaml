@@ -8,5 +8,10 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: my-canary-operator
   name: canary-sample
+  namespace: my-canary-operator-system
 spec:
   # TODO(user): Add fields here
+  deploymentName: example-app
+  image: nginx
+  replicas: 1
+  percentage: 20

@@ -1,0 +1,14 @@
+# custom API group that helps to avoid naming collisions with core K8s resources, and 
+# # v1alpha1 indicates this is an alpha version i.e. early stages of development
+#
+
+apiVersion: apps.egarciam.com/v1alpha1
+kind: Canary
+metadata:
+  name: canary-example-app
+  namespace: my-canary-operator-system
+spec:
+  deploymentName: example-app
+  image: alpine
+  replicas: 1
+  percentage: 20

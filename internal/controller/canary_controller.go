@@ -19,7 +19,9 @@ package controller
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -50,6 +52,19 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here
+	log.Log.Info("Me han llamado", "namespace", req.Namespace)
+	canary := &appsv1alpha1.Canary{}
+	if err := r.Get(ctx, req.NamespacedName, canary); err != nil {
+		log.Log.Error(err, "unable to fetch canary")
+		return ctrl.Result{}, err
+
+	}
+
+	var originalDeployment appsv1.Deployment
+	if err := r.Get(ctx, types.NamespacedName{Name: canary.Spec.DeploymentName, Namespace: req.Namespace}, &originalDeployment); err != nil {
+		log.Log.Error(err, "unable to ftehc original Deployment", "Deployment.Namespace", req.Namespace, "Deployment.Name", canary.Spec.DeploymentName)
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -58,5 +73,6 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *CanaryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Canary{}).
+		Owns(&appsv1.Deployment{}).
 		Complete(r)
 }
