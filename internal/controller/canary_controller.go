@@ -18,12 +18,19 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/egarciam/my-canary-operator/api/v1alpha1"
@@ -54,18 +61,94 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log := log.FromContext(ctx)
 
 	// TODO(user): your logic here
-	log.Info("Me han llamado", "namespace", req.Namespace)
+	log.Info("Me han llamado", "NAMESPACE", req.Namespace)
 	canary := &appsv1alpha1.Canary{}
 	if err := r.Get(ctx, req.NamespacedName, canary); err != nil {
 		log.Error(err, "unable to fetch canary")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 
 	}
-
+	log.Info("Seguimos para bingo", "NAMESPACE", req.Namespace)
 	var originalDeployment appsv1.Deployment
 	if err := r.Get(ctx, types.NamespacedName{Name: canary.Spec.DeploymentName, Namespace: req.Namespace}, &originalDeployment); err != nil {
-		log.Error(err, "unable to ftehc original Deployment", "Deployment.Namespace", req.Namespace, "Deployment.Name", canary.Spec.DeploymentName)
+		log.Error(err, "unable to fetch original Deployment", "Deployment.Namespace",
+			req.Namespace, "Deployment.Name", canary.Spec.DeploymentName)
 		return ctrl.Result{}, err
+	}
+
+	// Calculating Canary replicas
+	totalReplicas := *originalDeployment.Spec.Replicas
+	canaryReplicas := int32(math.Ceil(float64(totalReplicas) * float64(canary.Spec.Percentage) / 100))
+
+	// Defining the canary deployment
+	canaryDeployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-canary", canary.Spec.DeploymentName),
+			Namespace: req.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &canaryReplicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": canary.Spec.DeploymentName, "canary": "true"},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": canary.Spec.DeploymentName, "canary": "true"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: canary.Spec.Image,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	//Setting owner reference
+	if err := controllerutil.SetControllerReference(canary, canaryDeployment, r.Scheme); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	//Check for the existence of the deployment and create if it doesn't exist
+	found := &appsv1.Deployment{}
+	err := r.Get(ctx, types.NamespacedName{Name: canaryDeployment.Name,
+		Namespace: canaryDeployment.Namespace}, found)
+	if err != nil && errors.IsNotFound(err) {
+		log.Info("Creating a new deployment", "Deployment.Namespace", canaryDeployment.Namespace,
+			"Deployment.Name", canaryDeployment.Name, "Deployment.Replicas", canaryDeployment.Spec.Replicas)
+
+		//Como no lo hemos encontrado no existirá y lo creamos
+		err = r.Create(ctx, canaryDeployment)
+		if err != nil {
+			return ctrl.Result{}, nil
+		}
+	} else if err != nil {
+		return ctrl.Result{}, nil
+	}
+
+	//FINALLY listng pods and updating status
+	podList := &corev1.PodList{}
+	listOps := []client.ListOption{
+		client.InNamespace(canaryDeployment.Namespace),
+		client.MatchingLabels(labelsForCanary(canary.Name)),
+	}
+	if err := r.List(ctx, podList, listOps...); err != nil {
+		log.Error(err, "Faied to list pods", "Canary.Namespace", canary.Namespace, "Canary.Name", canary.Name)
+		return ctrl.Result{}, err
+	}
+
+	podNames := getPodNames(podList.Items)
+	//Update status if needed
+	if !reflect.DeepEqual(podNames, canary.Status.Nodes) {
+		canary.Status.Nodes = podNames
+		err := r.Status().Update(ctx, canary)
+		if err != nil {
+			log.Error(err, "Failed to Update canary Status")
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -77,4 +160,16 @@ func (r *CanaryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1alpha1.Canary{}).
 		Owns(&appsv1.Deployment{}).
 		Complete(r)
+}
+
+func labelsForCanary(name string) map[string]string {
+	return map[string]string{"type": "canary", "cr_name": name}
+}
+
+func getPodNames(pods []corev1.Pod) []string {
+	var podNames []string
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Name)
+	}
+	return podNames
 }

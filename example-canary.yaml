@@ -8,7 +8,7 @@ metadata:
   name: canary-example-app
   namespace: my-canary-operator-system
 spec:
-  deploymentName: example-app
+  deploymentName: deployment-to-be-controlled
   image: alpine
   replicas: 1
   percentage: 20
