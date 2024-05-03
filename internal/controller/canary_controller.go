@@ -51,20 +51,20 @@ type CanaryReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
 	// TODO(user): your logic here
-	log.Log.Info("Me han llamado", "namespace", req.Namespace)
+	log.Info("Me han llamado", "namespace", req.Namespace)
 	canary := &appsv1alpha1.Canary{}
 	if err := r.Get(ctx, req.NamespacedName, canary); err != nil {
-		log.Log.Error(err, "unable to fetch canary")
+		log.Error(err, "unable to fetch canary")
 		return ctrl.Result{}, err
 
 	}
 
 	var originalDeployment appsv1.Deployment
 	if err := r.Get(ctx, types.NamespacedName{Name: canary.Spec.DeploymentName, Namespace: req.Namespace}, &originalDeployment); err != nil {
-		log.Log.Error(err, "unable to ftehc original Deployment", "Deployment.Namespace", req.Namespace, "Deployment.Name", canary.Spec.DeploymentName)
+		log.Error(err, "unable to ftehc original Deployment", "Deployment.Namespace", req.Namespace, "Deployment.Name", canary.Spec.DeploymentName)
 		return ctrl.Result{}, err
 	}
 
