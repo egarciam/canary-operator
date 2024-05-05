@@ -9,6 +9,6 @@ metadata:
   namespace: my-canary-operator-system
 spec:
   deploymentName: deployment-to-be-controlled
-  image: alpine
-  replicas: 1
-  percentage: 20
+  image: nginx
+  replicas: 2
+  percentage: 40
